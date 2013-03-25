@@ -888,4 +888,16 @@ config  TOUCHSCREEN_COASIA
        tristate  "COASIA touchscreen driver"
        help
           COASIA touchscreen driver
+
+config TOUCHSCREEN_ZET6221
+       tristate "ZET6221 touchscreen driver"
+       help
+          Say Y here if you have a Zet6221 touchscreen connected to
+          your system.
+
+          If unsure, say N.
+
+          To compile this driver as a module, choose M here: the
+          module will be called zet6221.
+
 endif
