@@ -18,213 +18,77 @@
 
 extern unsigned int smc_debug;
 
-/******************************************************************************************************
- *                                       SD3.0 controller operation                                   *
- ******************************************************************************************************/
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_fifo_reset(struct sunxi_mmc_host* smc_host)
 {
     writel(readl(SDXC_REG_GCTRL)|SDXC_FIFOReset, SDXC_REG_GCTRL);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_dma_reset(struct sunxi_mmc_host* smc_host)
 {
     writel(readl(SDXC_REG_GCTRL)|SDXC_DMAReset, SDXC_REG_GCTRL);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 void sdxc_int_enable(struct sunxi_mmc_host* smc_host)
 {
     writel(readl(SDXC_REG_GCTRL)|SDXC_INTEnb, SDXC_REG_GCTRL);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 void sdxc_int_disable(struct sunxi_mmc_host* smc_host)
 {
     writel(readl(SDXC_REG_GCTRL)&(~SDXC_INTEnb), SDXC_REG_GCTRL);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_dma_enable(struct sunxi_mmc_host* smc_host)
 {
     writel(readl(SDXC_REG_GCTRL)|SDXC_DMAEnb, SDXC_REG_GCTRL);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_dma_disable(struct sunxi_mmc_host* smc_host)
 {
     writel(readl(SDXC_REG_GCTRL)|SDXC_DMAReset, SDXC_REG_GCTRL);
     writel(readl(SDXC_REG_GCTRL)&(~SDXC_DMAEnb), SDXC_REG_GCTRL);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_idma_reset(struct sunxi_mmc_host* smc_host)
 {
     writel(SDXC_IDMACSoftRST, SDXC_REG_DMAC);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_idma_on(struct sunxi_mmc_host* smc_host)
 {
     writel(SDXC_IDMACFixBurst | SDXC_IDMACIDMAOn, SDXC_REG_DMAC);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_idma_off(struct sunxi_mmc_host* smc_host)
 {
     writel(0, SDXC_REG_DMAC);
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_idma_int_enable(struct sunxi_mmc_host* smc_host, u32 int_mask)
 {
     writel(readl(SDXC_REG_IDIE)|int_mask, SDXC_REG_IDIE);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_idma_int_disable(struct sunxi_mmc_host* smc_host, u32 int_mask)
 {
     writel(readl(SDXC_REG_IDIE) & (~int_mask), SDXC_REG_IDIE);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_cd_debounce_on(struct sunxi_mmc_host* smc_host)
 {
     writel(readl(SDXC_REG_GCTRL)|SDXC_DebounceEnb, SDXC_REG_GCTRL);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_cd_debounce_off(struct sunxi_mmc_host* smc_host)
 {
     writel(readl(SDXC_REG_GCTRL)&(~SDXC_DebounceEnb), SDXC_REG_GCTRL);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_sel_access_mode(struct sunxi_mmc_host* smc_host, u32 access_mode)
 {
     writel((readl(SDXC_REG_GCTRL)&(~SDXC_ACCESS_BY_AHB)) | access_mode, SDXC_REG_GCTRL);
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline u32 sdxc_enable_imask(struct sunxi_mmc_host* smc_host, u32 imask)
 {
 	u32 newmask = readl(SDXC_REG_IMASK) | imask;
@@ -235,15 +99,6 @@ static __inline u32 sdxc_enable_imask(struct sunxi_mmc_host* smc_host, u32 imask
 	return newmask;
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline u32 sdxc_disable_imask(struct sunxi_mmc_host* smc_host, u32 imask)
 {
     u32 newmask = readl(SDXC_REG_IMASK) & (~imask);
@@ -254,15 +109,6 @@ static __inline u32 sdxc_disable_imask(struct sunxi_mmc_host* smc_host, u32 imas
 	return newmask;
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static __inline void sdxc_clear_imask(struct sunxi_mmc_host* smc_host)
 {
 	/* use 16bit read/write operation to enable/disable other interrupt bits
@@ -274,15 +120,6 @@ static __inline void sdxc_clear_imask(struct sunxi_mmc_host* smc_host)
 //	writel(readl(SDXC_REG_IMASK)&(SDXC_SDIOInt|SDXC_CardInsert|SDXC_CardRemove), SDXC_REG_IMASK);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 void sdxc_enable_sdio_irq(struct sunxi_mmc_host* smc_host, u32 enable)
 {
     if (enable)
@@ -291,43 +128,16 @@ void sdxc_enable_sdio_irq(struct sunxi_mmc_host* smc_host, u32 enable)
         sdxc_disable_imask(smc_host, SDXC_SDIOInt);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 void sdxc_sel_ddr_mode(struct sunxi_mmc_host* smc_host)
 {
     writel(readl(SDXC_REG_GCTRL) | SDXC_DDR_MODE, SDXC_REG_GCTRL);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 void sdxc_sel_sdr_mode(struct sunxi_mmc_host* smc_host)
 {
     writel(readl(SDXC_REG_GCTRL) & (~SDXC_DDR_MODE), SDXC_REG_GCTRL);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 void sdxc_set_buswidth(struct sunxi_mmc_host* smc_host, u32 width)
 {
     switch(width)
@@ -344,14 +154,6 @@ void sdxc_set_buswidth(struct sunxi_mmc_host* smc_host, u32 width)
     }
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 s32 sdxc_reset(struct sunxi_mmc_host* smc_host)
 {
     u32 rval = readl(SDXC_REG_GCTRL) | SDXC_SoftReset | SDXC_FIFOReset | SDXC_DMAReset;
@@ -367,14 +169,6 @@ s32 sdxc_reset(struct sunxi_mmc_host* smc_host)
     return 0;
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 s32 sdxc_program_clk(struct sunxi_mmc_host* smc_host)
 {
   	u32 rval;
@@ -407,14 +201,6 @@ s32 sdxc_program_clk(struct sunxi_mmc_host* smc_host)
 	return ret;
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 s32 sdxc_update_clk(struct sunxi_mmc_host* smc_host, u32 sclk, u32 cclk)
 {
     u32 rval;
@@ -466,14 +252,6 @@ s32 sdxc_update_clk(struct sunxi_mmc_host* smc_host, u32 sclk, u32 cclk)
     return real_clk;
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static void sdxc_send_cmd(struct sunxi_mmc_host* smc_host, struct mmc_command* cmd)
 {
     u32 imask;
@@ -549,14 +327,6 @@ static void sdxc_send_cmd(struct sunxi_mmc_host* smc_host, struct mmc_command* c
     writel(cmd_val, SDXC_REG_CMDR);
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static void  sdxc_init_idma_des(struct sunxi_mmc_host* smc_host, struct mmc_data* data)
 {
     struct sunxi_mmc_idma_des* pdes = smc_host->pdes;
@@ -565,7 +335,6 @@ static void  sdxc_init_idma_des(struct sunxi_mmc_host* smc_host, struct mmc_data
     u32 remain;
     u32 i, j;
 
-    /* 初始化IDMA Descriptor */
     #if SDXC_DES_MODE == 0      //chain mode
     for (i=0; i<data->sg_len; i++)
     {
@@ -630,15 +399,6 @@ static void  sdxc_init_idma_des(struct sunxi_mmc_host* smc_host, struct mmc_data
     return;
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 static int sdxc_prepare_dma(struct sunxi_mmc_host* smc_host, struct mmc_data* data)
 {
     u32 dma_len;
@@ -902,14 +662,6 @@ int sdxc_send_manual_stop(struct sunxi_mmc_host* smc_host, struct mmc_request* r
 	return ret;
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 void sdxc_request(struct sunxi_mmc_host* smc_host, struct mmc_request* request)
 {
     struct mmc_command* cmd = request->cmd;
@@ -977,15 +729,6 @@ void sdxc_request(struct sunxi_mmc_host* smc_host, struct mmc_request* request)
     sdxc_send_cmd(smc_host, cmd);
 }
 
-
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 void sdxc_check_status(struct sunxi_mmc_host* smc_host)
 {
     u32 raw_int;
@@ -1083,14 +826,6 @@ irq_out:
     sdxc_int_enable(smc_host);
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 s32 sdxc_request_done(struct sunxi_mmc_host* smc_host)
 {
     struct mmc_request* req = smc_host->mrq;
@@ -1205,14 +940,6 @@ _out_:
     return ret;
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 void sdxc_regs_save(struct sunxi_mmc_host* smc_host)
 {
 	struct sunximmc_ctrl_regs* bak_regs = &smc_host->bak_regs;
@@ -1227,14 +954,6 @@ void sdxc_regs_save(struct sunxi_mmc_host* smc_host)
 	bak_regs->idmacc	= readl(SDXC_REG_DMAC);
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 void sdxc_regs_restore(struct sunxi_mmc_host* smc_host)
 {
 	struct sunximmc_ctrl_regs* bak_regs = &smc_host->bak_regs;
@@ -1249,14 +968,6 @@ void sdxc_regs_restore(struct sunxi_mmc_host* smc_host)
     writel(bak_regs->idmacc  , SDXC_REG_DMAC );
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 s32 sdxc_init(struct sunxi_mmc_host* smc_host)
 {
 	struct sunxi_mmc_idma_des* pdes = NULL;
@@ -1294,14 +1005,6 @@ s32 sdxc_init(struct sunxi_mmc_host* smc_host)
     return 0;
 }
 
-/*
- * Method	  :
- * Description:
- * Parameters :
- *
- * Returns    :
- * Note       :
- */
 s32 sdxc_exit(struct sunxi_mmc_host* smc_host)
 {
 	/* free idma descriptor structrue */
