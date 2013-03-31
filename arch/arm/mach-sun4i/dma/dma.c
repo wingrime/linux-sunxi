@@ -39,6 +39,8 @@
 
 #include <mach/platform.h>
 #include <mach/dma.h>
+#include <asm/cacheflush.h>
+
 #include "dma_regs.h"
 
 #undef DEBUG
