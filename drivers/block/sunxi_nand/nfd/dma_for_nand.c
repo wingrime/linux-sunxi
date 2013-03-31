@@ -34,47 +34,13 @@
 static int nanddma_completed_flag = 1;
 static DECLARE_WAIT_QUEUE_HEAD(DMA_wait);
 
-//__krnl_event_t  *pNandDmaSem;
-
-
-/*
-*********************************************************************************************************
-*                                               DMA TRANSFER END ISR
-*
-* Description: dma transfer end isr.
-*
-* Arguments  : none;
-*
-* Returns    : EPDK_TRUE/ EPDK_FALSE
-*********************************************************************************************************
-*/
-//static __s32 _IsrDmaFinish(void)
-//{
-//    __u32       tmpIntQuery;
-//
-//    //check if current interrupt from dma copy memory
-//    tmpIntQuery = esDMA_QueryINT(hNandDmaHdle);
-//    if(!(tmpIntQuery & DMA_END_INT_MASK))
-//    {
-//        return EPDK_FALSE;
-//    }
-//
-//    //send semphore to wake up user task
-//    esKRNL_SemPost(pNandDmaSem);
-
-//    return EPDK_TRUE;
-//}
-
-
 __s32  NAND_DmaInit(void)
 {
-	//return (DMA_Init());
 	return 0;
 }
 
 __s32  NAND_DmaExit(void)
 {
-	//return (DMA_Exit());
 	return 0;
 }
 
@@ -109,57 +75,11 @@ __hdle NAND_RequestDMA  (__u32 dmatype)
 	sw_dma_set_buffdone_fn(ch, nanddma_buffdone);
 
 	return ch;
-
-//    hNandDmaHdle = esDMA_Request(dmatype);
-//    if(!hNandDmaHdle)
-//    {
-//        return 0;
-//    }
-//
-//
-//    //create semahpore to wake up user task
-//    pNandDmaSem = esKRNL_SemCreate(0);
-//    if(!pNandDmaSem)
-//    {
-//        __wrn("Create semaphore for wake up user failed!\n");
-//        //release dma resource
-//        esDMA_Release(hNandDmaHdle);
-//        hNandDmaHdle = 0;
-//        return 0;
-//    }
-//
-//    //install dma isr
-//    esINT_InsISR(esDMA_QueryINT(hNandDmaHdle)>>24, (__pISR_t)_IsrDmaFinish, 0);
-
-
-//	return hNandDmaHdle;
 }
 
 
 __s32  NAND_ReleaseDMA  (__hdle hDma)
 {
-//    if(hNandDmaHdle)
-//    {
-//
-//        esDMA_DisableINT(hNandDmaHdle, 0x03);
-//        esINT_UniISR(esDMA_QueryINT(hNandDmaHdle)>>24, (__pISR_t)_IsrDmaFinish);
-//
-//
-//        //release dma resource
-//        esDMA_Release(hNandDmaHdle);
-//        hNandDmaHdle = 0;
-//    }
-//
-//
-//    if(pNandDmaSem)
-//    {
-//        __u8    err;
-//        //delete semaphore
-//        esKRNL_SemDel(pNandDmaSem, OS_DEL_ALWAYS, &err);
-//        pNandDmaSem = 0;
-//    }
-
-
 	return 0;
 }
 
@@ -173,30 +93,6 @@ __s32 NAND_SettingDMA(__hdle hDMA, void * pArg)
 __s32 NAND_StartDMA(__u8 rw,__hdle hDMA, __u32 saddr, __u32 daddr, __u32 bytes)
 {
 	return 0;
-//	if (rw == 1)
-//		eLIBs_CleanFlushDCacheRegion((void *)saddr,bytes);
-//	else
-//		eLIBs_CleanFlushDCacheRegion((void *)daddr,bytes);
-//	//eLIBs_CleanFlushDCache();
-//
-//	#ifndef USE_PHYSICAL_ADDRESS
-//	saddr = (__u32)esMEMS_VA2PA((void *)saddr);
-//	daddr = (__u32)esMEMS_VA2PA((void *)daddr);
-//	#endif
-//
-//
-//    if(pNandDmaSem && hNandDmaHdle)
-//    {
-//        __u8    err;
-//
-//        //use interupt mode to wait dma transfer finish
-//        esKRNL_SemSet(pNandDmaSem, 0, &err);
-//        //eanble dma end interupt
-//        esDMA_EnableINT(hNandDmaHdle, DMA_END_INT_MASK, 0);
-//    }
-//
-//
-//	return (esDMA_Start(hDMA, saddr, daddr, bytes));
 }
 
 
@@ -212,82 +108,48 @@ __s32 NAND_DMAEqueueBuf(__hdle hDma,  __u32 buff_addr, __u32 len)
 __s32 NAND_RestartDMA(__hdle hDma)
 {
 	return 0;
-//	return (esDMA_Restart(hDma));
 }
 
 __s32 NAND_StopDMA(__hdle hDma)
 {
 	return 0;
-//	return (esDMA_Stop(hDma));
 }
 
 __s32 NAND_EnableDmaINT(__hdle hDma, __u16 xDma, __u32 mode)
 {
 	return 0;
-//	return (esDMA_EnableINT(hDma, xDma, mode));
 }
 
 __s32 NAND_DisableDmaINT(__hdle hDma, __u16 xDma)
 {
 	return 0;
-//	return (esDMA_DisableINT(hDma, xDma));
 }
 
 __u32 NAND_QueryDmaINT(__hdle hDma)
 {
 	return 0;
-//	return (esDMA_QueryINT(hDma));
 }
 
 __u32 NAND_QueryDmaStat(__hdle hDma)
 {
 	return 0;
-//	return (esDMA_QueryStat(hDma));
 }
 
 __u32 NAND_QueryDmaSrc (__hdle hDma)
 {
 	return 0;
-//	return (esDMA_QuerySrc (hDma));
 
 }
 
 __u32 NAND_QueryDmaDst(__hdle hDma)
 {
 	return 0;
-//	return (esDMA_QueryDst(hDma));
-
 }
 
 
 __s32 NAND_WaitDmaFinish(void)
 {
- 	//unsigned long flags;
- 	//int i;
-
-//    __u8        err;
-//
-//    if(pNandDmaSem && hNandDmaHdle)
-//    {
-//        //wait dma transfer finished
-//        esKRNL_SemPend(pNandDmaSem, 2, &err);
-//        //disable dma end interupt
-//        esDMA_DisableINT(hNandDmaHdle, DMA_END_INT_MASK);
-//    }
-//	while(1){
-//
-//		mutex_lock(&state_lock);
-//		local_irq_save(flags);
-//		if (nanddma_completed_flag){
-//			local_irq_restore(flags);
-//			 break;
-//			}
-//		for(i=0;i<1000;i++);
-//		local_irq_restore(flags);
-//	}
-
-	 wait_event(DMA_wait, nanddma_completed_flag);
-
-    return 0;
+	wait_event(DMA_wait, nanddma_completed_flag);
+	return 0;
 }
 
