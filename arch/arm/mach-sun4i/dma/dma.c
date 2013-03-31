@@ -837,8 +837,6 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 	unsigned long tmp;
 	unsigned long flags;
 
-	writel(pend_bits, dma_base + SW_DMA_DIRQPD);
-
 	chan = &sw_chans[chan_nr];
 	buf = chan->curr;
 
@@ -1014,6 +1012,8 @@ sw_dma_irq(int irq, void *dma_pending)
 	pr_debug("sw_dma_irq\n");
 
 	pend_reg = readl(dma_base + SW_DMA_DIRQPD);
+	/* clear IRQ pending status*/
+	writel(pend_reg, dma_base + SW_DMA_DIRQPD);
 
 	for(i=0; i<16; i++){
 		pend_bits = pend_reg & ( 3 <<  (i<<1) );
