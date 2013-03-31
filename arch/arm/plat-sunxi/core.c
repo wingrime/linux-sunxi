@@ -196,9 +196,9 @@ void __init sunxi_mali_core_fixup(struct tag *tags, char **cmdline,
  */
 
 static struct map_desc sw_io_desc[] __initdata = {
-	{ SW_VA_SRAM_BASE, __phys_to_pfn(SW_PA_SRAM_BASE),  (SZ_128K + SZ_64K), MT_MEMORY_ITCM  },
-	{ SW_VA_IO_BASE,   __phys_to_pfn(SW_PA_IO_BASE),    (SZ_1M + SZ_2M),    MT_DEVICE       },
-	{ SW_VA_BROM_BASE, __phys_to_pfn(SW_PA_BROM_BASE),  (SZ_64K),           MT_MEMORY_ITCM  },
+  { SW_VA_SRAM_BASE, __phys_to_pfn(SW_PA_SRAM_BASE),  (SZ_32K + SZ_16K),  MT_MEMORY_ITCM },
+  { SW_VA_IO_BASE,   __phys_to_pfn(SW_PA_IO_BASE),    (SZ_1M + SZ_2M),    MT_DEVICE      },
+  { SW_VA_BROM_BASE, __phys_to_pfn(SW_PA_BROM_BASE),  (SZ_64K),           MT_MEMORY_ITCM },
 };
 
 void __init sw_core_map_io(void)
