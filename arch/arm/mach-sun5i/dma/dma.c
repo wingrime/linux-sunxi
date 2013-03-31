@@ -47,6 +47,11 @@
 /* io map for dma */
 static void __iomem *dma_base;
 static struct kmem_cache *dma_kmem;
+/* irq delayed call*/
+struct workqueue_struct *dma_workqueue;
+struct work_struct dma_delayed_irq_work;
+unsigned long work_pend_reg; /* to worker*/
+static void  dma_irq_worker(struct work_struct *work);
 
 static int dma_channels;
 
@@ -486,7 +491,7 @@ static int sw_dma_waitforload(struct sw_dma_chan *chan, int line)
  * load a buffer, and update the channel state
 */
 
-static inline int sw_dma_loadbuffer(struct sw_dma_chan *chan, struct sw_dma_buf *buf)
+static int sw_dma_loadbuffer(struct sw_dma_chan *chan, struct sw_dma_buf *buf)
 {
 	pr_debug("sw_chan_loadbuffer: loading buff %p (0x%08lx,0x%06x)\n",
 		 buf, (unsigned long)buf->data, buf->size);
@@ -812,7 +817,6 @@ sw_dma_lastxfer(struct sw_dma_chan *chan)
 	}
 }
 
-
 #define pr_debug2(x...)
 
 void exec_pending_chan(int chan_nr, unsigned long pend_bits)
@@ -835,7 +839,8 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 	tmp = chan->map->conf_ptr->hf_irq & (pend_bits >> (chan_nr << 1));
 	if( tmp  & SW_DMA_IRQ_HALF ){
 		if(chan->state != SW_DMA_IDLE)     //if dma is stopped by app, app may not want callback
-			sw_dma_halfdone(chan, buf, SW_RES_OK);
+		  /* do halfdone callback*/
+		  sw_dma_halfdone(chan, buf, SW_RES_OK);
 	}
 	if (!(tmp & SW_DMA_IRQ_FULL))
 		return;
@@ -951,64 +956,50 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 	 * function, we cope with unsetting reload, etc */
 
 	if (chan->next != NULL && chan->state != SW_DMA_IDLE) {
-
-		switch (chan->load_state) {
-		case SW_DMALOAD_1RUNNING:
-			/* don't need to do anything for this state */
-			break;
-
-		case SW_DMALOAD_NONE:
-			/* can load buffer immediately */
-			break;
-
-		case SW_DMALOAD_1LOADED:
-			break;
-
-		case SW_DMALOAD_1LOADED_1RUNNING:
-			return;
-
-		default:
-			printk(KERN_ERR "dma%d: unknown load_state in irq, %d\n",
-			       chan->number, chan->load_state);
-			return;
+		if (chan->load_state != SW_DMALOAD_1LOADED_1RUNNING) {
+			/*
+			  handle SW_DMALOAD_1RUNNING,
+			  SW_DMALOAD_NONE, SW_DMALOAD_1LOADED
+			*/
+			local_irq_save(flags);
+			sw_dma_loadbuffer(chan, chan->next);
+			local_irq_restore(flags);
 		}
-
-		local_irq_save(flags);
-		sw_dma_loadbuffer(chan, chan->next);
-		local_irq_restore(flags);
 	} else {
+		/* we have no pending transfers */
 		sw_dma_lastxfer(chan);
-
 		/* see if we can stop this channel.. */
 		if (chan->load_state == SW_DMALOAD_NONE) {
 			pr_debug("dma%d: end of transfer, stopping channel (%ld)\n",
-				 chan->number, jiffies);
+				chan->number, jiffies);
 			sw_dma_ctrl(chan->number | DMACH_LOW_LEVEL,
-					 SW_DMAOP_STOP);
+				SW_DMAOP_STOP);
 		}
 	}
 }
 
+static void  dma_irq_worker(struct work_struct *work)
+{
+	unsigned long pend_bits;
+	int i;
+	/*handle DMA channels*/
+	for (i = 0; i < 16; i++) {
+		pend_bits = work_pend_reg & (3 <<  (i<<1));
+		if (pend_bits)
+			exec_pending_chan(i, pend_bits);
+	}
+}
 static irqreturn_t
 sw_dma_irq(int irq, void *dma_pending)
 {
-	unsigned long pend_reg;
-	unsigned long pend_bits;
-	int i;
 
 	pr_debug("sw_dma_irq\n");
-
-	pend_reg = readl(dma_base + SW_DMA_DIRQPD);
-	/* clear IRQ pending status */
-	writel(pend_reg, dma_base + SW_DMA_DIRQPD);
-
-	for(i=0; i<16; i++){
-		pend_bits = pend_reg & ( 3 <<  (i<<1) );
-		if(pend_bits){
-			exec_pending_chan(i, pend_bits);
-		}
-	}
-
+	/* read IRQ pendings statuses */
+	work_pend_reg = readl(dma_base + SW_DMA_DIRQPD);
+	/* clear IRQ pending statuses */
+	writel(work_pend_reg, dma_base + SW_DMA_DIRQPD);
+	/* qeue work */
+	queue_work(dma_workqueue, &dma_delayed_irq_work);
 	return IRQ_HANDLED;
 }
 
@@ -1557,12 +1548,17 @@ int __devinit sw_dma_init(unsigned int channels, unsigned int irq,
 	dma_kmem = kmem_cache_create("dma_desc", sizeof(struct sw_dma_buf), 0,
 				     SLAB_HWCACHE_ALIGN, sw_dma_cache_ctor);
 
-	if (dma_kmem == NULL) {
+	if (!dma_kmem) {
 		printk(KERN_ERR "dma failed to make kmem cache\n");
 		ret = -ENOMEM;
 		goto err2;
 	}
-
+	INIT_WORK(&dma_delayed_irq_work, dma_irq_worker);
+	dma_workqueue = create_singlethread_workqueue("dma_delayed_irq");
+	if (!dma_workqueue) {
+		ret = -ESRCH;
+		goto err2;
+	}
 	/* Disable & clear all interrupts */
 	//writel(0x0, SW_VA_DMAC_IO_BASE);
 	writel(0x0, dma_base);

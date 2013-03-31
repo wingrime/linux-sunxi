@@ -46,6 +46,11 @@
 /* io map for dma */
 static void __iomem *dma_base;
 static struct kmem_cache *dma_kmem;
+/* irq delayed call*/
+struct workqueue_struct *dma_workqueue;
+struct work_struct dma_delayed_irq_work;
+unsigned long work_pend_reg; /* to worker*/
+static void  dma_irq_worker(struct work_struct *work);
 
 static int dma_channels;
 
@@ -1001,26 +1006,29 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 		}
 	}
 }
-
-static irqreturn_t
-sw_dma_irq(int irq, void *dma_pending)
+static void  dma_irq_worker(struct work_struct *work)
 {
-	unsigned long pend_reg;
 	unsigned long pend_bits;
 	int i;
-
-	pr_debug("sw_dma_irq\n");
-
-	pend_reg = readl(dma_base + SW_DMA_DIRQPD);
-	/* clear IRQ pending status*/
-	writel(pend_reg, dma_base + SW_DMA_DIRQPD);
-
-	for(i=0; i<16; i++){
-		pend_bits = pend_reg & ( 3 <<  (i<<1) );
+	/*handle DMA channels*/
+	for (i = 0; i < 16; i++) {
+		pend_bits = work_pend_reg & (3 <<  (i<<1));
 		if(pend_bits){
 			exec_pending_chan(i, pend_bits);
 		}
 	}
+}
+
+static irqreturn_t
+sw_dma_irq(int irq, void *dma_pending)
+{
+	pr_debug("sw_dma_irq\n");
+	/* read IRQ pendings statuses */
+	work_pend_reg = readl(dma_base + SW_DMA_DIRQPD);
+	/* clear IRQ pending statuses */
+	writel(work_pend_reg, dma_base + SW_DMA_DIRQPD);
+	/* qeue work */
+	queue_work(dma_workqueue, &dma_delayed_irq_work);
 	return IRQ_HANDLED;
 }
 
@@ -1558,7 +1566,6 @@ static void sw_dma_cache_ctor(void *p)
 }
 
 /* initialisation code */
-
 int __devinit sw_dma_init(unsigned int channels, unsigned int irq,
 			  unsigned int stride)
 {
@@ -1577,6 +1584,12 @@ int __devinit sw_dma_init(unsigned int channels, unsigned int irq,
 	if (dma_kmem == NULL) {
 		printk(KERN_ERR "dma failed to make kmem cache\n");
 		ret = -ENOMEM;
+		goto err2;
+	}
+	INIT_WORK(&dma_delayed_irq_work, dma_irq_worker);
+	dma_workqueue = create_singlethread_workqueue("dma_delayed_irq");
+	if (!dma_workqueue) {
+		ret = -ESRCH;
 		goto err2;
 	}
 
