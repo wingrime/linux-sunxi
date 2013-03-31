@@ -196,21 +196,6 @@ int  emactx_dma_opfn(struct sw_dma_chan *ch, enum sw_chan_op op_code)
 	return 0;
 }
 
-#if 0
-__hdle emac_RequestDMA(__u32 dmatype)
-{
-	__hdle ch;
-
-	ch = sw_dma_request(dmatype, &nand_dma_client, NULL);
-	if (ch < 0)
-		return ch;
-
-	sw_dma_set_opfn(ch, nanddma_opfn);
-	sw_dma_set_buffdone_fn(ch, nanddma_buffdone);
-
-	return ch;
-}
-#endif
 
 __s32 emacrx_DMAEqueueBuf(int hDma,  void *buff_addr, __u32 len)
 {
