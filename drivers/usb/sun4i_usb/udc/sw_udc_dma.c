@@ -48,10 +48,6 @@ static sw_udc_dma_parg_t sw_udc_dma_para;
 
 extern void sw_udc_dma_completion(struct sw_udc *dev, struct sw_udc_ep *ep, struct sw_udc_request *req);
 
-static void sw_udc_CleanFlushDCacheRegion(void *adr, __u32 bytes)
-{
-	__cpuc_flush_dcache_area(adr, bytes + (1 << 5) * 2 - 2);
-}
 
 /*
 *******************************************************************************
@@ -270,7 +266,6 @@ void sw_udc_dma_start(struct sw_udc_ep *ep, __u32 fifo, __u32 buffer, __u32 len)
 		      sw_udc_dma_para.ep->num,
 		      fifo, buffer, (u32)phys_to_virt(buffer), len);
 
-	sw_udc_CleanFlushDCacheRegion((void *)buffer, (size_t)len);
 
 	sw_udc_switch_bus_to_dma(ep, is_tx_ep(ep));
 

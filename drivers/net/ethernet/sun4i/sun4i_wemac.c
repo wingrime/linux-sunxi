@@ -212,15 +212,9 @@ __hdle emac_RequestDMA(__u32 dmatype)
 }
 #endif
 
-void eLIBs_CleanFlushDCacheRegion(void *adr, __u32 bytes)
-{
-	__cpuc_flush_dcache_area(adr, bytes + (1 << 5) * 2 - 2);
-}
-
 __s32 emacrx_DMAEqueueBuf(int hDma,  void *buff_addr, __u32 len)
 {
 	static int seq_rx;
-	eLIBs_CleanFlushDCacheRegion((void *)buff_addr, len);
 
 	emacrx_dma_completed_flag = 0;
 	return sw_dma_enqueue(hDma, (void *)(seq_rx++), (dma_addr_t)buff_addr, len);
@@ -229,7 +223,6 @@ __s32 emacrx_DMAEqueueBuf(int hDma,  void *buff_addr, __u32 len)
 __s32 emactx_DMAEqueueBuf(int hDma,  void *buff_addr, __u32 len)
 {
 	static int seq_tx;
-	eLIBs_CleanFlushDCacheRegion(buff_addr, len);
 
 	emactx_dma_completed_flag = 0;
 	return sw_dma_enqueue(hDma, (void *)(seq_tx++), (dma_addr_t)buff_addr, len);

@@ -523,6 +523,7 @@ static inline int sw_dma_loadbuffer(struct sw_dma_chan *chan, struct sw_dma_buf 
 	}
 
 	if(chan->dcon & SW_NDMA_CONF_CONTI || chan->dcon & SW_DDMA_CONF_CONTI || chan->load_state == SW_DMALOAD_NONE){
+	  __cpuc_flush_dcache_area((void *)buf->data, buf->size + (1 << 5) * 2 - 2);
 		writel(__virt_to_bus(buf->data), chan->addr_reg);
 		dma_wrreg(chan, SW_DMA_DCNT, buf->size);
 	}
@@ -890,6 +891,7 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 		if(!(( chan->dcon & SW_NDMA_CONF_CONTI) || (chan->dcon & SW_DDMA_CONF_CONTI))){
 			struct sw_dma_buf  *next = chan->curr->next;
 
+			__cpuc_flush_dcache_area((void *)next->data, next->size + (1 << 5) * 2 - 2);
 			writel(__virt_to_bus(next->data), chan->addr_reg);
 			dma_wrreg(chan, SW_DMA_DCNT, next->size);
 			tmp = SW_DCONF_LOADING | chan->dcon;
@@ -941,6 +943,7 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 		 * waitforload operation must follow dma loading to update dma load state
 		 */
 		if(chan->load_state == SW_DMALOAD_1LOADED && !((chan->dcon & SW_NDMA_CONF_CONTI)||(chan->dcon & SW_DDMA_CONF_CONTI))){
+		  __cpuc_flush_dcache_area((void *)chan->curr->data, chan->curr->size + (1 << 5) * 2 - 2);
 			writel(__virt_to_bus(chan->curr->data), chan->addr_reg);
 			dma_wrreg(chan, SW_DMA_DCNT, chan->curr->size);
 			tmp = SW_DCONF_LOADING | chan->dcon;

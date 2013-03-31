@@ -199,16 +199,11 @@ __s32 NAND_StartDMA(__u8 rw,__hdle hDMA, __u32 saddr, __u32 daddr, __u32 bytes)
 //	return (esDMA_Start(hDMA, saddr, daddr, bytes));
 }
 
-void eLIBs_CleanFlushDCacheRegion_nand(void *adr, size_t bytes)
-{
-	__cpuc_flush_dcache_area(adr, bytes + (1 << 5) * 2 - 2);
-}
 
 
 int seq=0;
 __s32 NAND_DMAEqueueBuf(__hdle hDma,  __u32 buff_addr, __u32 len)
 {
-	eLIBs_CleanFlushDCacheRegion_nand((void *)buff_addr, (size_t)len);
 
 	nanddma_completed_flag = 0;
 	return sw_dma_enqueue((int)hDma, (void*)(seq++), buff_addr, len);
