@@ -1012,28 +1012,6 @@ sw_dma_irq(int irq, void *dma_pending)
 	return IRQ_HANDLED;
 }
 
-/*
- * helper for dma pending check in irq disabled env.
- * it dose fully like the dma irq triggled.
- * mostly you can check if dma finished by using flags set within
- * bufferdone call back function.
- */
-void poll_dma_pending(int chan_nr)
-{
-	unsigned long pend_bits;
-
-	if (chan_nr & DMACH_LOW_LEVEL)
-		chan_nr = chan_nr & ~DMACH_LOW_LEVEL;
-	else
-		chan_nr = (lookup_dma_channel(chan_nr))->number;
-
-	pend_bits = readl(dma_base + SW_DMA_DIRQPD)  & (3 << (chan_nr << 1));
-	if(pend_bits){
-		exec_pending_chan(chan_nr, pend_bits);
-	}
-}
-EXPORT_SYMBOL(poll_dma_pending);
-
 static struct sw_dma_chan *sw_dma_map_channel(int channel);
 
 /* sw_request_dma
