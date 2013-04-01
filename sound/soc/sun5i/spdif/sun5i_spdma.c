@@ -28,7 +28,7 @@
 
 #include <asm/dma.h>
 #include <mach/hardware.h>
-#include <mach/dma.h>
+#include <plat/dma.h>
 
 #include "sun5i_spdif.h"
 #include "sun5i_spdma.h"
