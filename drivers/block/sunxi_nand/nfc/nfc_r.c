@@ -24,12 +24,7 @@
 //#include "dma_for_nand.h"
 #include <plat/dma.h>
 #include <linux/dma-mapping.h>
-#include <linux/wait.h>
-#include <linux/sched.h>
 
-#define NAND_IO_TIMEOUT 2000 /*2 sec*/
-
-static DECLARE_WAIT_QUEUE_HEAD(IO_wait);
 __u32	nand_board_version;
 __u32 	pagesize;
 __hdle 	dma_hdle;
@@ -85,19 +80,19 @@ void nfc_repeat_mode_disable(void)
 /*******************wait nfc********************************************/
 __s32 _wait_cmdfifo_free(void)
 {
-	int ret = wait_event_timeout(IO_wait,\
-				(NFC_READ_REG(NFC_REG_ST) &  NFC_CMD_FIFO_STATUS), \
-				msecs_to_jiffies(NAND_IO_TIMEOUT));
-	if (!ret)
+	__s32 timeout = 0xffff;
+
+	while ( (timeout--) && (NFC_READ_REG(NFC_REG_ST) & NFC_CMD_FIFO_STATUS) );
+	if (timeout <= 0)
 		return -ERR_TIMEOUT;
 	return 0;
 }
 
 __s32 _wait_cmd_finish(void)
 {
-	int ret = wait_event_timeout(IO_wait,  !(NFC_READ_REG(NFC_REG_ST) & NFC_CMD_INT_FLAG) ,\
-			msecs_to_jiffies(NAND_IO_TIMEOUT));
-	if (!ret)
+	__s32 timeout = 0xffff;
+	while( (timeout--) && !(NFC_READ_REG(NFC_REG_ST) & NFC_CMD_INT_FLAG) );
+	if (timeout <= 0)
 		return -ERR_TIMEOUT;
 
 	NFC_WRITE_REG(NFC_REG_ST, NFC_READ_REG(NFC_REG_ST) & NFC_CMD_INT_FLAG);
@@ -244,18 +239,18 @@ __s32 _wait_dma_end(void)
 __s32 _reset(void)
 {
 	__u32 cfg;
-	int ret;
-	
+
+	__s32 timeout = 0xffff;
+
 	/*reset NFC*/
 	cfg = NFC_READ_REG(NFC_REG_CTL);
 	cfg |= NFC_RESET;
 	NFC_WRITE_REG(NFC_REG_CTL, cfg);
 	//waiting reset operation end
-	
-	ret = wait_event_timeout(IO_wait,  ! (NFC_READ_REG(NFC_REG_CTL) & NFC_RESET) , \
-				msecs_to_jiffies(NAND_IO_TIMEOUT));
-	if (!ret)
+	while((timeout--) && (NFC_READ_REG(NFC_REG_CTL) & NFC_RESET));
+	if (timeout <= 0)
 		return -ERR_TIMEOUT;
+
 	return 0;
 }
 
