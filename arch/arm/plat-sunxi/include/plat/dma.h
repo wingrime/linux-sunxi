@@ -256,11 +256,10 @@ enum sw_dmadir {
 //	SW_DMA_RWDEV		/* can r/w dev */
 };
 
-enum dma_hf_irq {
-	SW_DMA_IRQ_NO,
-	SW_DMA_IRQ_HALF,
-	SW_DMA_IRQ_FULL
-};
+#define SW_DMA_IRQ_NO 0
+#define SW_DMA_IRQ_HALF 1
+#define SW_DMA_IRQ_FULL 2
+
 /* enum sw_chan_op
  *
  * operation codes passed to the DMA code by the user, and also used
@@ -298,7 +297,6 @@ struct sw_dma_client {
 struct sw_dma_buf;
 struct sw_dma_buf {
 	struct sw_dma_buf	*next;
-	int			 magic;		/* magic */
 	int			 size;		/* buffer size in bytes */
 	dma_addr_t		 data;		/* start of DMA data */
 	dma_addr_t		 ptr;		/* where the DMA got to [1] */
@@ -496,8 +494,6 @@ extern int sw_dma_enqueue(unsigned int channel, void *id,
  *
  * configure the dma channel
 */
-extern void poll_dma_pending(int chan_nr);
-
 extern int sw_dma_config(unsigned int channel, struct dma_hw_conf* user_conf);
 
 extern int sw15_dma_init(void);
@@ -516,7 +512,6 @@ extern int sw_dma_getposition(unsigned int channel,
 
 extern int sw_dma_set_opfn(unsigned int, sw_dma_opfn_t rtn);
 extern int sw_dma_set_buffdone_fn(unsigned int, sw_dma_cbfn_t rtn);
-extern int sw_dma_set_halfdone_fn(unsigned int, sw_dma_cbfn_t rtn);
 extern int sw_dma_getcurposition(unsigned int channel,
 				   dma_addr_t *src, dma_addr_t *dest);
 

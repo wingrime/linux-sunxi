@@ -63,8 +63,6 @@ struct sw_dma_chan sw_chans[SW_DMA_CHANNELS];
 
 /* debugging functions */
 
-#define BUF_MAGIC (0xcefabdba)
-
 #define dmawarn(fmt...) printk(KERN_DEBUG fmt)
 
 #define dma_regaddr(chan, reg) ((chan)->regs + (reg))
@@ -147,7 +145,9 @@ static struct sw_dma_chan *dma_chan_map[DMACH_MAX];
  * change the dma channel number given into a real dma channel id
 */
 
-static struct sw_dma_chan *lookup_dma_channel(unsigned int channel)
+static int sw_dma_dostop(struct sw_dma_chan *chan);
+
+static __inline struct sw_dma_chan *lookup_dma_channel(unsigned int channel)
 {
 	if (channel & DMACH_LOW_LEVEL)
 		return &sw_chans[channel & ~DMACH_LOW_LEVEL];
@@ -163,7 +163,6 @@ inline void DMA_COPY_HW_CONF(struct dma_hw_conf *to, struct dma_hw_conf *from)
 	to->address_type = from->address_type;
 	to->dir          = from->dir;
 	to->reload       = from->reload;
-	to->hf_irq       = from->hf_irq;
 	to->from         = from->from;
 	to->to           = from->to;
 	to->cmbk         = from->cmbk;
@@ -317,14 +316,6 @@ static inline void sw_dma_buffdone(struct sw_dma_chan *chan, struct sw_dma_buf *
 	}
 }
 
-static inline void sw_dma_halfdone(struct sw_dma_chan *chan, struct sw_dma_buf *buf,
-		     enum sw_dma_buffresult result)
-{
-	if (chan->callback_hd != NULL) {
-		(chan->callback_hd)(chan, buf->id, buf->size, result);
-	}
-}
-
 /* sw_dma_start
  *
  * start a dma channel going
@@ -454,7 +445,6 @@ int sw_dma_enqueue(unsigned int channel, void *id,
 
 	buf->next  = NULL;
 	buf->id    = id;
-	buf->magic = BUF_MAGIC;
 	buf->data  = buf->ptr = data;
 	buf->size  = size;
 
@@ -488,7 +478,7 @@ int sw_dma_enqueue(unsigned int channel, void *id,
 	if (chan->state == SW_DMA_RUNNING) {
 		if (chan->load_state == SW_DMALOAD_1LOADED && 1) {
 			if (sw_dma_waitforload(chan, __LINE__) == 0) {
-				printk(KERN_ERR "dma%d: loadbuffer:"
+				printk(KERN_ERR "sunxi:dma%d: enqueue:"
 				       "timeout loading buffer\n",
 				       chan->number);
 				dbg_showchan(chan);
@@ -516,15 +506,7 @@ EXPORT_SYMBOL(sw_dma_enqueue);
 static inline void
 sw_dma_freebuf(struct sw_dma_buf *buf)
 {
-	int magicok = (buf->magic == BUF_MAGIC);
-
-	buf->magic = -1;
-
-	if (magicok) {
-		kmem_cache_free(dma_kmem, buf);
-	} else {
-		printk("sw_dma_freebuf: buff %p with bad magic\n", buf);
-	}
+	kmem_cache_free(dma_kmem, buf);
 }
 
 /* sw_dma_lastxfer
@@ -565,57 +547,34 @@ sw_dma_lastxfer(struct sw_dma_chan *chan)
 	}
 }
 
-
-#define pr_debug2(x...)
-
-void exec_pending_chan(int chan_nr, unsigned long pend_bits)
+void exec_pending_chan(int chan_nr)
 {
 	struct sw_dma_chan *chan;
 	struct sw_dma_buf  *buf;
 	unsigned long tmp;
-	unsigned long flags;
 
-	writel(pend_bits, dma_base + SW_DMA_DIRQPD);
+	int conti;
 
 	chan = &sw_chans[chan_nr];
 	buf = chan->curr;
 
 	/* Check me */
 	if (chan->map == NULL) {
-		pr_warning("Unexpected pending interrupt detected, pend_bits=0x%08x\n", (unsigned int)pend_bits);
+		pr_warning("Unexpected pending interrupt detected\n");
 		return;
 	}
 
-	tmp = chan->map->conf_ptr->hf_irq & (pend_bits >> (chan_nr << 1));
-	if( tmp  & SW_DMA_IRQ_HALF ){
-		if(chan->state != SW_DMA_IDLE)     //if dma is stopped by app, app may not want callback
-			sw_dma_halfdone(chan, buf, SW_RES_OK);
-	}
-	if (!(tmp & SW_DMA_IRQ_FULL))
-		return;
+	conti = (chan->dcon & SW_NDMA_CONF_CONTI) || (chan->dcon&SW_DDMA_CONF_CONTI);
 
 	dbg_showchan(chan);
 	/* modify the channel state */
 	switch (chan->load_state) {
 	case SW_DMALOAD_1RUNNING:
-		/* TODO - if we are running only one buffer, we probably
-		 * want to reload here, and then worry about the buffer
-		 * callback */
-
-		pr_debug("L%d, loadstate SW_DMALOAD_1RUNNING -> SW_DMALOAD_NONE\n", __LINE__);
-		chan->load_state = SW_DMALOAD_NONE;
-		break;
-
 	case SW_DMALOAD_1LOADED:
-		/* iirc, we should go back to NONE loaded here, we
-		 * had a buffer, and it was never verified as being
-		 * loaded.
-		 */
-
-		pr_debug("L%d, loadstate SW_DMALOAD_1LOADED -> SW_DMALOAD_NONE\n", __LINE__);
 		chan->load_state = SW_DMALOAD_NONE;
 		break;
-
+	case SW_DMALOAD_NONE:
+		break;
 	case SW_DMALOAD_1LOADED_1RUNNING:
 		/* we'll worry about checking to see if another buffer is
 		 * ready after we've called back the owner. This should
@@ -626,7 +585,7 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 		pr_debug("L%d, loadstate SW_DMALOAD_1LOADED_1RUNNING -> SW_DMALOAD_1LOADED\n", __LINE__);
 		chan->load_state = SW_DMALOAD_1LOADED;
 
-		if(!(( chan->dcon & SW_NDMA_CONF_CONTI) || (chan->dcon & SW_DDMA_CONF_CONTI))){
+		if (!conti) {
 			struct sw_dma_buf  *next = chan->curr->next;
 
 			writel(__virt_to_bus(next->data), chan->addr_reg);
@@ -634,18 +593,13 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 			tmp = SW_DCONF_LOADING | chan->dcon;
 			dma_wrreg(chan, SW_DMA_DCONF, tmp);
 			tmp = dma_rdreg(chan, SW_DMA_DCONF);
-			if (sw_dma_waitforload(chan, __LINE__) == 0) {
+			if (!sw_dma_waitforload(chan, __LINE__)) {
 				printk(KERN_ERR "dma%d: timeout waiting for load (%s)\n",
 				       chan->number, __func__);
 				return;
 			}
 		}
 
-		break;
-
-	case SW_DMALOAD_NONE:
-		printk(KERN_ERR "dma%d: IRQ with no loaded buffer?\n",
-		       chan->number);
 		break;
 
 	default:
@@ -662,13 +616,8 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 		chan->curr = buf->next;
 		buf->next  = NULL;
 
-		if (buf->magic != BUF_MAGIC) {
-			printk(KERN_ERR "dma%d: %s: buf %p incorrect magic\n",
-			       chan->number, __func__, buf);
-			return;
-		}
 
-		if(chan->state != SW_DMA_IDLE)     //if dma is stopped by app, app may not want callback
+		if (chan->state != SW_DMA_IDLE)   /* if dma is stopped by app, don't callback */
 			sw_dma_buffdone(chan, buf, SW_RES_OK);
 
 		/* free resouces */
@@ -678,14 +627,15 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 		 * in callback operation. if there is another buffer loaded in dma queue, run it and
 		 * change relative state for next transfer.
 		 * waitforload operation must follow dma loading to update dma load state
+		 * Note: wemac do this
 		 */
-		if(chan->load_state == SW_DMALOAD_1LOADED && !((chan->dcon & SW_NDMA_CONF_CONTI)||(chan->dcon & SW_DDMA_CONF_CONTI))){
+		if (chan->load_state == SW_DMALOAD_1LOADED && !conti) {
 			writel(__virt_to_bus(chan->curr->data), chan->addr_reg);
 			dma_wrreg(chan, SW_DMA_DCNT, chan->curr->size);
 			tmp = SW_DCONF_LOADING | chan->dcon;
 			dma_wrreg(chan, SW_DMA_DCONF, tmp);
 			tmp = dma_rdreg(chan, SW_DMA_DCONF);
-			if (sw_dma_waitforload(chan, __LINE__) == 0) {
+			if (!sw_dma_waitforload(chan, __LINE__)) {
 				/* flag error? */
 				printk(KERN_ERR "dma%d: timeout waiting for load (%s)\n",
 				       chan->number, __func__);
@@ -705,13 +655,7 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 
 		switch (chan->load_state) {
 		case SW_DMALOAD_1RUNNING:
-			/* don't need to do anything for this state */
-			break;
-
 		case SW_DMALOAD_NONE:
-			/* can load buffer immediately */
-			break;
-
 		case SW_DMALOAD_1LOADED:
 			break;
 
@@ -724,63 +668,62 @@ void exec_pending_chan(int chan_nr, unsigned long pend_bits)
 			return;
 		}
 
-		local_irq_save(flags);
-		sw_dma_loadbuffer(chan, chan->next);
-		local_irq_restore(flags);
+		/* load buffer */
+		if (conti || chan->load_state == SW_DMALOAD_NONE) {
+			/*conti or none - dma running, load shadows for next transfer*/
+			writel(__virt_to_bus(chan->next->data), chan->addr_reg);
+			dma_wrreg(chan, SW_DMA_DCNT, chan->next->size);
+		}
+
+		chan->next = chan->next->next;
+		/* update the state of the channel */
+		switch (chan->load_state) {
+		case SW_DMALOAD_NONE:
+			chan->load_state = SW_DMALOAD_1LOADED;
+			break;
+
+		case SW_DMALOAD_1RUNNING:
+			chan->load_state = SW_DMALOAD_1LOADED_1RUNNING;
+			break;
+		default:
+			/* not reachable*/
+			break;
+
+		}
+		/* end load buffer*/
+
 	} else {
 		sw_dma_lastxfer(chan);
 
 		/* see if we can stop this channel.. */
 		if (chan->load_state == SW_DMALOAD_NONE) {
 			pr_debug("dma%d: end of transfer, stopping channel (%ld)\n",
-				 chan->number, jiffies);
-			sw_dma_ctrl(chan->number | DMACH_LOW_LEVEL,
-					 SW_DMAOP_STOP);
+				chan->number, jiffies);
+			sw_dma_dostop(lookup_dma_channel(chan->number|DMACH_LOW_LEVEL));
 		}
 	}
 }
 
-static irqreturn_t
-sw_dma_irq(int irq, void *dma_pending)
+static irqreturn_t sw_dma_irq(int irq, void *dma_pending)
 {
 	unsigned long pend_reg;
-	unsigned long pend_bits;
-	int i;
+	int chan_nr = 0;
 
 	pr_debug("sw_dma_irq\n");
 
 	pend_reg = readl(dma_base + SW_DMA_DIRQPD);
+	/* remove pending flag*/
+	writel(pend_reg, dma_base + SW_DMA_DIRQPD);
 
-	for(i=0; i<16; i++){
-		pend_bits = pend_reg & ( 3 <<  (i<<1) );
-		if(pend_bits){
-			exec_pending_chan(i, pend_bits);
-		}
+	while (pend_reg) {
+		if (pend_reg & SW_DMA_IRQ_FULL)
+			exec_pending_chan(chan_nr);
+		chan_nr++;
+		pend_reg >>= 2;
 	}
+
 	return IRQ_HANDLED;
 }
-
-/*
- * helper for dma pending check in irq disabled env.
- * it dose fully like the dma irq triggled.
- * mostly you can check if dma finished by using flags set within
- * bufferdone call back function.
- */
-void poll_dma_pending(int chan_nr)
-{
-	unsigned long pend_bits;
-
-	if (chan_nr & DMACH_LOW_LEVEL)
-		chan_nr = chan_nr & ~DMACH_LOW_LEVEL;
-	else
-		chan_nr = (lookup_dma_channel(chan_nr))->number;
-
-	pend_bits = readl(dma_base + SW_DMA_DIRQPD)  & (3 << (chan_nr << 1));
-	if(pend_bits){
-		exec_pending_chan(chan_nr, pend_bits);
-	}
-}
-EXPORT_SYMBOL(poll_dma_pending);
 
 static struct sw_dma_chan *sw_dma_map_channel(int channel);
 
@@ -891,6 +834,12 @@ static int sw_dma_dostop(struct sw_dma_chan *chan)
 
 	sw_dma_call_op(chan,  SW_DMAOP_STOP);
 
+	/*for sun5i*/
+	tmp = readl(dma_base + SW_DMA_DIRQPD);
+	tmp &= (3 << (chan->number<<1));
+	writel(tmp, dma_base + SW_DMA_DIRQPD);
+
+
 	tmp = dma_rdreg(chan, SW_DMA_DCONF);
 	tmp &= ~SW_DCONF_LOADING;
 	dma_wrreg(chan, SW_DMA_DCONF, tmp);
@@ -917,7 +866,7 @@ static void sw_dma_waitforstop(struct sw_dma_chan *chan)
 			return;
 	}
 
-	pr_debug("dma%d: failed to stop?\n", chan->number);
+	pr_debug("sunxi:dma%d: failed to load shadow registers\n", chan->number);
 }
 
 
@@ -1147,14 +1096,10 @@ int sw_dma_config(unsigned int channel, struct dma_hw_conf* user_conf)
 	dcon |= (1 << 15);   //backdoor: byte counter register shows the remain bytes for transfer
 	chan->dcon = dcon;
 
-	if( hw_conf->hf_irq < 2 ){
-		printk(KERN_ERR "irq type is not suppoted yet.\n");
-		return -EINVAL;
-	}
 
 	temp = readl(dma_base + SW_DMA_DIRQEN);
 	temp &= ~(3 << (chan->number<<1));
-	temp |= hw_conf->hf_irq << (chan->number<<1);
+	temp |= SW_DMA_IRQ_FULL << (chan->number<<1);
 	writel(temp, dma_base + SW_DMA_DIRQEN);
 
 	if( IS_DADECATE_DMA(chan)){
@@ -1220,20 +1165,6 @@ int sw_dma_set_buffdone_fn(unsigned int channel, sw_dma_cbfn_t rtn)
 }
 
 EXPORT_SYMBOL(sw_dma_set_buffdone_fn);
-
-int sw_dma_set_halfdone_fn(unsigned int channel, sw_dma_cbfn_t rtn)
-{
-	struct sw_dma_chan *chan = lookup_dma_channel(channel);
-
-	if (chan == NULL)
-		return -EINVAL;
-
-	chan->callback_hd = rtn;
-
-	return 0;
-}
-
-EXPORT_SYMBOL(sw_dma_set_halfdone_fn);
 
 /* sw_dma_getposition
  *
