@@ -506,13 +506,6 @@ void aw_spi_set_sample_delay(u32 on_off, void *base_addr)
 
 static int spi_sunxi_get_cfg_csbitmap(int bus_num);
 
-/* flush d-cache */
-static void spi_sunxi_cleanflush_dcache_region(void *addr, __u32 len)
-{
-	__cpuc_flush_dcache_area(addr, len + (1 << 5) * 2 - 2);
-}
-
-
 /* ------------------------------- dma operation start----------------------------- */
 #if defined CONFIG_ARCH_SUN4I
 static struct sw_dma_client spi_dma_client[] = {
@@ -648,8 +641,6 @@ static int spi_sunxi_config_dma(struct sunxi_spi *aw_spi, void *buf, unsigned in
     ret = sw_dma_config(aw_spi->dma_id, &spi_hw_conf);
     /* flush the transfer queue */
     ret += sw_dma_ctrl(aw_spi->dma_id, SW_DMAOP_FLUSH);
-    /* 1. flush d-cache */
-    spi_sunxi_cleanflush_dcache_region((void *)buf, len);
     /* 2. enqueue dma transfer, --FIXME--: buf: virtual address, not physical address. */
     ret += sw_dma_enqueue(aw_spi->dma_id, (void *)aw_spi, (dma_addr_t)buf, len);
     return ret;

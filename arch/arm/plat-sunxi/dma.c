@@ -38,6 +38,7 @@
 #include <plat/dma.h>
 #include <linux/serial_core.h>
 #include <linux/platform_device.h>
+#include <asm/cacheflush.h>
 
 #include <mach/platform.h>
 #include "dma_regs.h"
@@ -616,6 +617,9 @@ void exec_pending_chan(int chan_nr)
 		chan->curr = buf->next;
 		buf->next  = NULL;
 
+		/*invalidate cache before call callback and remove buff*/
+
+		__cpuc_flush_dcache_area((void *)buf->data, buf->size + (1 << 5) * 2 - 2);
 
 		if (chan->state != SW_DMA_IDLE)   /* if dma is stopped by app, don't callback */
 			sw_dma_buffdone(chan, buf, SW_RES_OK);
