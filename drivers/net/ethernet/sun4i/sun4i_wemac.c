@@ -300,16 +300,6 @@ __s32 emacrx_WaitDmaFinish(void)
 	return 0;
 }
 
-__s32 emactx_WaitDmaFinish(void)
-{
-	while (1) {
-		poll_dma_pending(ch_tx);
-		if (emactx_dma_completed_flag)
-			break;
-	}
-
-	return 0;
-}
 
 /* WEMAC network board routine ---------------------------- */
 
@@ -325,18 +315,10 @@ wemac_reset(wemac_board_info_t *db)
 	udelay(200);
 }
 
-#if 0
-static void wemac_outblk_dma(void __iomem *reg, void *data, int count)
-{
-	wemac_dma_config_start(1, data, count);
-	emactx_WaitDmaFinish();
-}
-#else
 static int wemac_inblk_dma(void __iomem *reg, void *data, int count)
 {
 	return wemac_dma_config_start(0, data, count);
 }
-#endif
 
 static void wemac_outblk_32bit(void __iomem *reg, void *data, int count)
 {
