@@ -15,6 +15,7 @@
 #include "host_op.h"
 #include "sdxc.h"
 #include "smc_syscall.h"
+#include <linux/sched.h>
 
 extern unsigned int smc_debug;
 
@@ -489,6 +490,7 @@ void sdxc_do_pio_read(struct sunxi_mmc_host* smc_host)
 
     fifo_count = (readl(SDXC_REG_STAS)>>17)&0x1f;
 	while (fifo_count) {
+		schedule();
 	    fifo = fifo_count << 2;
 		if (!smc_host->pio_bytes) {
 			res = sdxc_get_data_buffer(smc_host, &smc_host->pio_bytes, &smc_host->pio_ptr);
