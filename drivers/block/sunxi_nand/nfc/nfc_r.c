@@ -24,6 +24,7 @@
 //#include "dma_for_nand.h"
 #include <plat/dma.h>
 #include <linux/dma-mapping.h>
+#include <linux/sched.h>
 
 __u32	nand_board_version;
 __u32 	pagesize;
@@ -82,7 +83,8 @@ __s32 _wait_cmdfifo_free(void)
 {
 	__s32 timeout = 0xffff;
 
-	while ( (timeout--) && (NFC_READ_REG(NFC_REG_ST) & NFC_CMD_FIFO_STATUS) );
+	while ( (timeout--) && (NFC_READ_REG(NFC_REG_ST) & NFC_CMD_FIFO_STATUS) )
+		schedule();
 	if (timeout <= 0)
 		return -ERR_TIMEOUT;
 	return 0;
@@ -91,7 +93,8 @@ __s32 _wait_cmdfifo_free(void)
 __s32 _wait_cmd_finish(void)
 {
 	__s32 timeout = 0xffff;
-	while( (timeout--) && !(NFC_READ_REG(NFC_REG_ST) & NFC_CMD_INT_FLAG) );
+	while( (timeout--) && !(NFC_READ_REG(NFC_REG_ST) & NFC_CMD_INT_FLAG) )
+		schedule();
 	if (timeout <= 0)
 		return -ERR_TIMEOUT;
 
@@ -247,7 +250,8 @@ __s32 _reset(void)
 	cfg |= NFC_RESET;
 	NFC_WRITE_REG(NFC_REG_CTL, cfg);
 	//waiting reset operation end
-	while((timeout--) && (NFC_READ_REG(NFC_REG_CTL) & NFC_RESET));
+	while((timeout--) && (NFC_READ_REG(NFC_REG_CTL) & NFC_RESET))
+		schedule();
 	if (timeout <= 0)
 		return -ERR_TIMEOUT;
 
