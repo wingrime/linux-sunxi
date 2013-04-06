@@ -115,10 +115,10 @@ static cycle_t aw_clksrc_read(struct clocksource *cs)
 
     /* disable interrupt response */
     raw_local_irq_save(flags);
-
+    
     /* latch 64bit counter and wait ready for read */
     TMR_REG_CNT64_CTL |= (1<<1);
-    //    while(TMR_REG_CNT64_CTL & (1<<1));
+    while(TMR_REG_CNT64_CTL & (1<<1));
 
     /* read the 64bits counter */
     lower = TMR_REG_CNT64_LO;
