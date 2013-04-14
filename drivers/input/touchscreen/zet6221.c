@@ -590,8 +590,8 @@ u8 zet_register_read(u8 e_reg_name, u8 *pbt_buf, u8 bt_len)
 #define ZET_CMD_BOOTLOADER      0xB9
 typedef struct zet_devinfo {
 u8 project_code[7];       /* 1 - 8  */
-u16 x_res;                /* 9 - 10 */
-u16 y_res;                /* 11 -12 */
+u16 y_res;                /* 9 - 10 */
+u16 x_res;                /* 11 -12 */
 u8 data_format;           /* 13     */
 u8 x_trace_num;           /* 14     */
 u8 y_trace_num;           /* 15     */
@@ -693,10 +693,10 @@ static void  zet_ts_pen_irq_work(struct work_struct *work)
 		return;
 	}
 	/* check data sanity */
-	if (buf[0] == 0x3c ) {
+//	if (buf[0] == 0x3c ) {
 	  fingers = buf[1];
 	  /*first*/
-	  if ( fingers & 0x80  == 0x80) {
+//	  if ( fingers & 0x80  == 0x80) {
 	    x = ((unsigned int)((u8)buf[3]>>4)<<8) + (u8)buf[4];
 	    y = ((unsigned int)((u8)buf[3] & (u8)0xf)<<8) + (u8)buf[5];
 	    p = buf[6] & 0xf;
@@ -711,7 +711,7 @@ static void  zet_ts_pen_irq_work(struct work_struct *work)
 		if (revert_y_flag)
 		  y  = SCREEN_MAX_Y - y;
 		if (exchange_x_y_flag)
-		  swap(x, y);
+			swap(x, y);
 		if (!revert_x_flag)
 		  x  = SCREEN_MAX_X - x;
 		pr_info("zet: x2 = %d, y1 = %d.\n", x, y);
@@ -723,8 +723,8 @@ static void  zet_ts_pen_irq_work(struct work_struct *work)
 		input_report_abs(data->input_dev, ABS_MT_PRESSURE, TS_PRESSURE);
 		input_report_key(data->input_dev, BTN_TOUCH, 1);
 		input_mt_sync(data->input_dev);
-	  }
-	}
+//	  }
+//	  }
 	input_sync(data->input_dev);
 #ifdef CONFIG_ZET6221_TS_PEN_TIMER
 	mod_timer(&data->pen_release_timer, jiffies + msecs_to_jiffies(50));
